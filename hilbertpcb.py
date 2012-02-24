@@ -3,11 +3,13 @@
 # from http://github.com/cortesi/scurve
 from scurve.hilbert import Hilbert
 
+
 def mm(mils):
     return mils*0.0254
 
 def mils(mm):
     return mm*39.3700787
+
 
 class HeatedTraceCalculator(object):
     # for simplicity, sizes are in mils, temperature is in C, current is Amps
@@ -30,6 +32,7 @@ class HeatedTraceCalculator(object):
         
     def length_for_width(self, width):
         return self.ohms*self.thickness*width/self.resistivity
+
     
 class HilbertTrace(Hilbert, object):
     def __init__(self, width, order):
@@ -63,7 +66,99 @@ class HilbertTrace(Hilbert, object):
         if idx >= len(self)-1:
             raise IndexError
         return [self.point(idx), self.point(idx+1)]
-    
+
+   
+class PCBWriter(object):
+    def __init__(self, filename):
+        self.filename = filename
+        
+    def header(self):
+        return dedent("""PCBNEW-BOARD Version 1 date
+            
+            # Hacked together using nrp's Hilbert curve PCB generator
+            
+            $GENERAL
+            encoding utf-8
+            LayerCount 2
+            Ly 1FFF8001
+            EnabledLayers 1FFF8001
+            Links 0
+            NoConn 0
+            Di 0 0 0 0
+            Ndraw 0
+            Ntrack 0
+            Nzone 0
+            BoardThickness 630
+            Nmodule 0
+            Nnets 1
+            $EndGENERAL
+
+            $SHEETDESCR
+            Sheet A3 16535 11700
+            Title ""
+            Date "24 feb 2012"
+            Rev ""
+            Comp ""
+            Comment1 ""
+            Comment2 ""
+            Comment3 ""
+            Comment4 ""
+            $EndSHEETDESCR
+
+            $SETUP
+            InternalUnit 0.000100 INCH
+            Layers 2
+            Layer[0] Back signal
+            Layer[15] Front signal
+            TrackWidth 100
+            TrackClearence 100
+            ZoneClearence 200
+            TrackMinWidth 100
+            DrawSegmWidth 150
+            EdgeSegmWidth 150
+            ViaSize 350
+            ViaDrill 250
+            ViaMinSize 350
+            ViaMinDrill 200
+            MicroViaSize 200
+            MicroViaDrill 50
+            MicroViasAllowed 0
+            MicroViaMinSize 200
+            MicroViaMinDrill 50
+            TextPcbWidth 120
+            TextPcbSize 600 800
+            EdgeModWidth 150
+            TextModSize 600 600
+            TextModWidth 120
+            PadSize 600 600
+            PadDrill 320
+            Pad2MaskClearance 100
+            AuxiliaryAxisOrg 0 0
+            PcbPlotParams (pcbplotparams (layerselection 3178497) (usegerberextensions true) (excludeedgelayer true) (linewidth 60) (plotframeref false) (viasonmask false) (mode 1) (useauxorigin false) (hpglpennumber 1) (hpglpenspeed 20) (hpglpendiameter 15) (hpglpenoverlay 2) (pscolor true) (psnegative false) (psa4output false) (plotreference true) (plotvalue true) (plotothertext true) (plotinvisibletext false) (padsonsilk false) (subtractmaskfromsilk false) (outputformat 1) (mirror false) (drillshape 1) (scaleselection 1) (outputdirectory ""))
+            $EndSETUP
+
+            $EQUIPOT
+            Na 0 ""
+            St ~
+            $EndEQUIPOT
+            $NCLASS
+            Name "Default"
+            Desc "This is the default net class."
+            Clearance 100
+            TrackWidth 100
+            ViaDia 350
+            ViaDrill 250
+            uViaDia 200
+            uViaDrill 50
+            AddNet ""
+            $EndNCLASS""")
+            
+    def footer(self):
+        return dedent("""$ZONE
+            $EndZONE
+            $EndBOARD""")
+
+
 class PCBGenerator(object):
     # size is in inches, currently treats all boards as squares
     def __init__(self, volts, watts, size):
@@ -108,6 +203,7 @@ class PCBGenerator(object):
 
         return ((min_order, min_length, self.trace.width_for_length(min_length)),
                 (max_order, max_length, self.trace.width_for_length(max_length)))
+
 
 if __name__ == '__main__':
     generator = PCBGenerator(12, 100, (5, 5))
