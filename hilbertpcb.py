@@ -31,17 +31,17 @@ class HeatedTraceCalculator(object):
     def length_for_width(self, width):
         return self.ohms*self.thickness*width/self.resistivity
     
-class HilbertTrace(Hilbert):
+class HilbertTrace(Hilbert, object):
     def __init__(self, width, order):
         Hilbert.__init__(self, 2, order)
-        self.width = width
+        self.width = width*1000.0
         
     def euclidean(self):
         """
         Euclidean length of the curve in mils
         """
         sq = 2**self.order
-        return (sq-(1.0/sq))*self.width*1000.0
+        return (sq-(1.0/sq))*self.width
         
     def __getitem__(self, idx):
         if idx >= len(self):
@@ -52,11 +52,11 @@ class HilbertTrace(Hilbert):
         """
         Location of the point on the curve in mils
         """
-        point = super.point(idx)
+        point = super(HilbertTrace, self).point(idx)
         dim = self.dimensions()
         offset = 1.0/(2.0*float(dim[0]))
-        x = int((float(point[0])/float(dim[0])+offset)*1000.0)
-        y = int((float(point[1])/float(dim[1])+offset)*1000.0)
+        x = int((float(point[0])/float(dim[0])+offset)*self.width)
+        y = int((float(point[1])/float(dim[1])+offset)*self.width)
         return [x, y]
         
     def segment(self, idx):
@@ -74,6 +74,12 @@ class PCBGenerator(object):
         
     def electrical_description(self):
         return "%.2fV %.2fW %.2fA %.2fohms" % (self.trace.volts, self.trace.watts, self.trace.amps, self.trace.ohms)
+        
+    def blah(self, order):
+        h = HilbertTrace(self.pcb_width, order)
+        count = len(h)
+        for i in range(0, count-1):
+            print h.segment(i)
         
     def length(self):
         min_width = self.trace.min_width()
