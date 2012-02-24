@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+# from http://github.com/cortesi/scurve
+from scurve.hilbert import Hilbert
+
 def mm(mils):
     return mils*0.0254
 
@@ -27,20 +30,44 @@ class HeatedTraceCalculator(object):
         
     def length_for_width(self, width):
         return self.ohms*self.thickness*width/self.resistivity
-
-class HilbertCurveGenerator(object):
-    def __init__(self):
-        pass
+    
+class HilbertTrace(Hilbert):
+    def __init__(self, width, order):
+        Hilbert.__init__(self, 2, order)
+        self.width = width
         
-    def length(self, order):
-        sq = 2**order
-        return sq-(1.0/sq)
+    def euclidean(self):
+        """
+        Euclidean length of the curve in mils
+        """
+        sq = 2**self.order
+        return (sq-(1.0/sq))*self.width*1000.0
+        
+    def __getitem__(self, idx):
+        if idx >= len(self):
+            raise IndexError
+        return self.point(idx)
+        
+    def point(self, idx):
+        """
+        Location of the point on the curve in mils
+        """
+        point = super.point(idx)
+        dim = self.dimensions()
+        offset = 1.0/(2.0*float(dim[0]))
+        x = int((float(point[0])/float(dim[0])+offset)*1000.0)
+        y = int((float(point[1])/float(dim[1])+offset)*1000.0)
+        return [x, y]
+        
+    def segment(self, idx):
+        if idx >= len(self)-1:
+            raise IndexError
+        return [self.point(idx), self.point(idx+1)]
     
 class PCBGenerator(object):
     # size is in inches, currently treats all boards as squares
     def __init__(self, volts, watts, size):
         self.trace = HeatedTraceCalculator(volts, watts)
-        self.hilbert = HilbertCurveGenerator()
         self.size = size
         self.pcb_width = min(size[0], size[1])
         self.spacing = 10 # mils the traces need to be apart (limited by the manufacturing process)
@@ -56,7 +83,8 @@ class PCBGenerator(object):
         max_length = 0
         order = 1
         while 1:
-            trace_len = 1000.0*self.pcb_width*self.hilbert.length(order)
+            h = HilbertTrace(self.pcb_width, order)
+            trace_len = h.euclidean()
             temp_width = self.trace.width_for_length(trace_len)
                 
             # save the first width that is above the minimum required
@@ -64,6 +92,7 @@ class PCBGenerator(object):
                 min_length = trace_len
                 min_order = order
                 
+            # stop if there is no longer space on the board for the traces
             if (order*2*temp_width+(order*2+1)*self.spacing)/1000.0 > self.pcb_width:
                 break
                 
