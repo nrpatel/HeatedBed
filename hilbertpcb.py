@@ -71,9 +71,12 @@ class HilbertTrace(Hilbert, object):
    
 class PCBWriter(object):
     def __init__(self, filename, size, width, segments):
+        """
+        Units for size are inches and width are mils.
+        """
         self.filename = filename
         self.segments = segments
-        self.size = size
+        self.size = [int(size[0]*10000.0), int(size[1]*10000.0)]
         self.width = width
         self.offset = 10000
         print self.header()
@@ -196,11 +199,14 @@ class PCBGenerator(object):
         self.size = size
         self.pcb_width = min(size[0], size[1])
         self.spacing = 10 # mils the traces need to be apart (limited by the manufacturing process)
+        self.min_order = ()
+        self.max_order = ()
+        self.generate_orders()
         
     def electrical_description(self):
         return "%.2fV %.2fW %.2fA %.2fohms" % (self.trace.volts, self.trace.watts, self.trace.amps, self.trace.ohms)
         
-    def blah(self, order):
+    def generate_trace(self, order):
         h = HilbertTrace(self.pcb_width, order)
         count = len(h)
         ret = []
@@ -208,7 +214,19 @@ class PCBGenerator(object):
             ret.append(h.segment(i))
         return ret
         
-    def length(self):
+    def generate_min_trace(self):
+        """
+        Generates the minimum length trace meeting the wattage criteria.
+        """
+        return self.generate_trace(self.min_order[0]+1)
+        
+    def generate_max_trace(self):
+        """
+        Generates the maximum length trace that will fit on the board.
+        """
+        return self.generate_trace(self.max_order[0]+1)
+        
+    def generate_orders(self):
         min_width = self.trace.min_width()
         min_order = 0
         min_length = 0
@@ -225,19 +243,23 @@ class PCBGenerator(object):
                 min_length = trace_len
                 min_order = order
                 
+            #print "%d %f %f %f %f"  % (order, temp_width, trace_len, order*2*temp_width/1000.0, (order*2*temp_width+(order*2+1)*self.spacing)/1000.0)
+                
             # stop if there is no longer space on the board for the traces
-            if (order*2*temp_width+(order*2+1)*self.spacing)/1000.0 > self.pcb_width:
+            if (2**(order-1)*temp_width+(2**(order-1)+1)*self.spacing)/1000.0 > self.pcb_width:
+                max_length = trace_len
+                max_order = order
                 break
                 
             max_length = trace_len
             max_order = order
             order += 1
 
-        return ((min_order, min_length, self.trace.width_for_length(min_length)),
-                (max_order, max_length, self.trace.width_for_length(max_length)))
+        self.min_order = (min_order, min_length, self.trace.width_for_length(min_length))
+        self.max_order = (max_order, max_length, self.trace.width_for_length(max_length))
 
 
 if __name__ == '__main__':
-    generator = PCBGenerator(12, 100, (5, 5))
-    lmin, lmax = generator.length()
-    PCBWriter("blah", [50000, 50000], int(lmax[2]), generator.blah(6))
+    size = [5.0, 5.0]
+    generator = PCBGenerator(12, 100, size)
+    PCBWriter("blah", size, int(generator.max_order[2]), generator.generate_max_trace())
